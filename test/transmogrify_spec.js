@@ -8,8 +8,10 @@ function getFileString(filename) {
 }
 
 describe("transmogrify", () => {
+  let dependencyMap;
   beforeEach (() => {
-    this.dependencyMap = {
+    dependencyMap = {
+      something: "something",
       dependencyA: "something_a",
       dependencyB: "something_b"
     };
@@ -18,12 +20,12 @@ describe("transmogrify", () => {
   it("should translate a normal angular module", () => {
     const fileString = getFileString("angular_module.js");
     const transformedFileString = getFileString("angular_module_transformed.js");
-    expect(transmogrify(fileString, this.dependencyMap)).to.equal(transformedFileString);
+    expect(transmogrify(fileString, dependencyMap)).to.equal(transformedFileString.trim());
   });
 
   it("should not modify an already transformed module", () => {
     const fileString = getFileString("exported_angular_module.js");
     const transformedFileString = getFileString("exported_angular_module_transformed.js");
-    expect(transmogrify(fileString, this.dependencyMap)).to.equal(transformedFileString);
+    expect(transmogrify(fileString, dependencyMap)).to.equal(transformedFileString.trim());
   });
 });

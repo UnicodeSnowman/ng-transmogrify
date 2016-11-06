@@ -1,0 +1,14 @@
+#!/usr/local/bin/node
+
+require("babel-register");
+const { filesInDirectory } = require("../src/utils");
+const buildDependencyMap = require("../src/build_dependency_map").default;
+const transmogrify = require("../src/transmogrify").default;
+const path = require("path");
+const fs = require("fs");
+const { dependencyDir, convertDir } = require("minimist")(process.argv.slice(2));
+const dependencies = buildDependencyMap(dependencyDir);
+
+filesInDirectory(convertDir).forEach((filepath) => {
+  fs.writeFileSync(filepath, transmogrify(fs.readFileSync(filepath), dependencies));
+});
