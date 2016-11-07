@@ -10,5 +10,13 @@ const { dependencyDir, convertDir } = require("minimist")(process.argv.slice(2))
 const dependencies = buildDependencyMap(dependencyDir);
 
 filesInDirectory(convertDir).forEach((filepath) => {
-  fs.writeFileSync(filepath, transmogrify(fs.readFileSync(filepath), dependencies));
+  const transformed = transmogrify(fs.readFileSync(filepath);
+  fs.writeFileSync(
+    filepath,
+    transformed,
+    filepath,
+    Object.assign({}, dependencies, {
+      $state: "~angular-ui-router",
+      $stateParams: "~angular-ui-router"
+    })));
 });

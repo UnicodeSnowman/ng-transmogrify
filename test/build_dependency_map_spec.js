@@ -7,7 +7,9 @@ describe("buildDependencyMap", () => {
     expect(buildDependencyMap(`${path.resolve(__dirname, "../", "assets/dependencies")}`)).to.eql({
       dependencyA: `${path.resolve(__dirname, "../", "assets/dependencies/dependency_a.js")}`,
       dependencyB: `${path.resolve(__dirname, "../", "assets/dependencies/dependency_b.js")}`,
-      dependencyC: `${path.resolve(__dirname, "../", "assets/dependencies/dependency_c.js")}`
+      dependencyC: `${path.resolve(__dirname, "../", "assets/dependencies/dependency_c.js")}`,
+      whateverExportedFilter: `${path.resolve(__dirname, "../", "assets/dependencies/exported_filter.js")}`,
+      whateverFilter: `${path.resolve(__dirname, "../", "assets/dependencies/filter.js")}`
     });
   });
 });

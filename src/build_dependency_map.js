@@ -7,17 +7,25 @@ function isPotentialDependency(obj) {
   return ["ExpressionStatement", "ExportDefaultDeclaration"].includes(obj.type);
 }
 
+function getInjectableTypeSuffix(node) {
+  if (node.callee.property.name === "filter") {
+    return "Filter";
+  } else {
+    return "";
+  }
+}
+
 function getInjectableNames(statements = []) {
   return statements.map((statement) => {
     switch (statement.type) {
       case "ExpressionStatement":
         if (isAngularModule(statement.expression)) {
-          return statement.expression.arguments[0].value;
+          return `${statement.expression.arguments[0].value}${getInjectableTypeSuffix(statement.expression)}`;
         } else {
           return undefined;
         }
       case "ExportDefaultDeclaration":
-        return statement.declaration.arguments[0].value;
+        return `${statement.declaration.arguments[0].value}${getInjectableTypeSuffix(statement.declaration)}`;
       default:
         return undefined;
     }

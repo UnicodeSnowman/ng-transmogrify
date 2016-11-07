@@ -12,20 +12,22 @@ describe("transmogrify", () => {
   beforeEach (() => {
     dependencyMap = {
       something: "something",
-      dependencyA: "something_a",
-      dependencyB: "something_b"
+      dependencyA: `${path.resolve(__dirname, "../assets/something_a_directory/something_a.js")}`,
+      dependencyB: `${path.resolve(__dirname, "../something_b.js")}`,
+      $state: "~angular-ui-router",
+      $stateParams: "~angular-ui-router"
     };
   });
 
   it("should translate a normal angular module", () => {
     const fileString = getFileString("angular_module.js");
     const transformedFileString = getFileString("angular_module_transformed.js");
-    expect(transmogrify(fileString, dependencyMap)).to.equal(transformedFileString.trim());
+    expect(transmogrify(fileString, path.resolve(__dirname, "../assets"), dependencyMap)).to.equal(transformedFileString.trim());
   });
 
   it("should not modify an already transformed module", () => {
     const fileString = getFileString("exported_angular_module.js");
     const transformedFileString = getFileString("exported_angular_module_transformed.js");
-    expect(transmogrify(fileString, dependencyMap)).to.equal(transformedFileString.trim());
+    expect(transmogrify(fileString, "", dependencyMap)).to.equal(transformedFileString.trim());
   });
 });
