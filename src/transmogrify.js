@@ -35,7 +35,7 @@ function resolvePath(pathToDependency, currentFilePath) {
     // is a node_modules import
     resolvedPath = pathToDependency.slice(1);
   } else {
-    resolvedPath = path.relative(currentFilePath, pathToDependency)
+    resolvedPath = path.relative(path.dirname(currentFilePath), pathToDependency)
     if (resolvedPath.indexOf(".") !== 0) {
       // a relative import. path.relative does not add `./` for files
       // in the same directory, which we need here

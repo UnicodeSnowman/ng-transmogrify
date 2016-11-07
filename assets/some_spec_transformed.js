@@ -1,5 +1,5 @@
-import LookupModule from "../../app/common/lookup";
-import htInputFormatAreaModule from "../../app/common/ht_input_format_area";
+import LookupModule from "../app/common/lookup";
+import htInputFormatAreaModule from "../app/common/ht_input_format_area";
 import {formatters} from "../../support/matchers";
 
 describe("htInputFormatArea", () => {
