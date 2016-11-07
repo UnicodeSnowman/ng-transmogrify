@@ -6,6 +6,8 @@ const mapValuesWithKey = mapValues.convert({ cap: false });
 const forEachWithKey = forEach.convert({ cap: false });
 
 const {
+  callExpression,
+  expressionStatement,
   importDeclaration,
   importDefaultSpecifier,
   exportDefaultDeclaration,
@@ -19,9 +21,9 @@ function getInjectionIdentifiers(args = []) {
   return args[args.length - 1].params
 }
 
-function buildES6Import(identifier, path) {
+function buildES6Import(dependencyName, path) {
   return importDeclaration(
-    [importDefaultSpecifier(identifier)],
+    [importDefaultSpecifier(identifier(`${dependencyName}Module`))],
     literal(path)
   );
 }
@@ -48,12 +50,8 @@ function resolvePath(pathToDependency, currentFilePath) {
   return resolvedPath;
 }
 
-function transformModule({ ast, bodyIndex, dependencyMap, filepath }) {
-  const { expression } = ast.program.body[bodyIndex];
-
-  // de-dupe dependencies
-  const dependencies = flow(
-    getInjectionIdentifiers,
+function dedupeDependencies(identifiers, dependencyMap) {
+  return flow(
     filter(({ name }) => dependencyMap[name]),
     map("name"),
     groupBy((key) => dependencyMap[key]),
@@ -66,12 +64,20 @@ function transformModule({ ast, bodyIndex, dependencyMap, filepath }) {
       }
     }),
     invert
-  )(expression.arguments)
+  )(identifiers);
+}
+
+
+function transformModule({ ast, bodyIndex, dependencyMap, filepath }) {
+  const { expression } = ast.program.body[bodyIndex];
+
+  // de-dupe dependencies
+  const dependencies = dedupeDependencies(getInjectionIdentifiers(expression.arguments), dependencyMap)
 
   // import dependencies
   forEachWithKey((pathToDependency, dependencyName) => {
     const resolvedPath = resolvePath(pathToDependency, filepath)
-    ast.program.body.unshift(buildES6Import(identifier(`${dependencyName}Module`), resolvedPath));
+    ast.program.body.unshift(buildES6Import(dependencyName, resolvedPath));
     bodyIndex++;
   })(dependencies);
 
@@ -88,27 +94,72 @@ function transformModule({ ast, bodyIndex, dependencyMap, filepath }) {
   return ast;
 }
 
-function transformSpec({ ast, bodyIndex, dependencyMap, filepath }) {
+function transformSpec({ ast, dependencyMap, filepath }) {
+  let dependencyIdentifiers;
+  let injectParentBody = [];
+  recast.visit(ast, {
+    visitIdentifier: function(path) {
+      if (path.value.name === "inject") {
+        dependencyIdentifiers = path.parentPath.node.arguments[0].params;
+        // here at path.value.name === "inject", we are at
+        // inject((a, b) => {
+        //   ...
+        // });
+        //
+        // i.e.
+        //
+        // BlockStatement > ExpressionStatement > CallExpression > Identifier
+        // so to get us to the body of the surrounding block statement, we need:
+        // path.parentPath.parentPath.parentPath.node.body
+        injectParentBody = path.parentPath.parentPath.parentPath.node.body;
+        this.abort();
+      } else {
+        this.traverse(path);
+      }
+    }
+  });
+
+  const dependencies = dedupeDependencies(dependencyIdentifiers, dependencyMap);
+
+  const angularMockModule = callExpression(
+    identifier("angular.mock.module"),
+    Object.keys(dependencies).map((name) => identifier(`${name}Module`))
+  );
+
+  injectParentBody.unshift(expressionStatement(angularMockModule));
+
+  forEachWithKey((pathToDependency, dependencyName) => {
+    const resolvedPath = resolvePath(pathToDependency, filepath)
+    ast.program.body.unshift(buildES6Import(dependencyName, resolvedPath));
+  })(dependencies);
+
   return ast;
 }
 
 export default function(fileString, filepath, dependencyMap) {
   let ast = recast.parse(fileString);
-  const transform = filepath.indexOf("_spec.js") >= 0 ? transformSpec : transformModule;
 
-  // TODO will take first index of an angular module found... likely need to handle
-  // case where we have multiple angular modules in the file
-  let angularModuleIndex = ast.program.body.findIndex((statement) => isAngularModule(statement.expression));
-
-  if (angularModuleIndex >= 0) {
-    ast = transform({
+  if (filepath.indexOf("_spec.js") >= 0) {
+    ast = transformSpec({
       ast,
-      bodyIndex: angularModuleIndex,
       dependencyMap,
       filepath
-    });
+    })
   } else {
-    console.log(`Unable to transform file: ${filepath}`)
+    // TODO will take first index of an angular module found... likely need to handle
+    // case where we have multiple angular modules in the file
+    let angularModuleIndex = ast.program.body.findIndex((statement) => isAngularModule(statement.expression));
+
+    if (angularModuleIndex >= 0) {
+      ast = transformModule({
+        ast,
+        bodyIndex: angularModuleIndex,
+        dependencyMap,
+        filepath
+      });
+    } else {
+      console.log(`Unable to transform file: ${filepath}`)
+    }
   }
 
   return recast.prettyPrint(ast, {

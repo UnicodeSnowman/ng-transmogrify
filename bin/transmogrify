@@ -17,6 +17,7 @@ filesInDirectory(convertDir).forEach((filepath) => {
     filepath,
     Object.assign({}, dependencies, {
       $state: "~angular-ui-router",
-      $stateParams: "~angular-ui-router"
+      $stateParams: "~angular-ui-router",
+      $translate: "~ngTranslate"
     })));
 });
