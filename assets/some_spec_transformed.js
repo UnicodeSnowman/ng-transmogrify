@@ -10,7 +10,7 @@ describe("htInputFormatArea", () => {
     angular.mock.module(htInputFormatAreaModule, LookupModule);
     jasmine.addMatchers(formatters);
 
-    inject((htInputFormatArea, Lookup) => {
+    inject((htInputFormatArea, _Lookup_) => {
       formatter = htInputFormatArea;
 
       localizationContext = {

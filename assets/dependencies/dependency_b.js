@@ -6,4 +6,4 @@ export default angular.module("dependencyB", [
   thingBModule
 ]).factory("dependencyB", (thingA, thingB) => {
   return {};
-});
+}).name;

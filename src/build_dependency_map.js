@@ -9,12 +9,13 @@ function isPotentialDependency(obj) {
 
 function getInjectableTypeSuffix(node) {
   if (node.callee.property.name === "filter") {
-    return "Filter";
+    return "Filter"
   } else {
     return "";
   }
 }
 
+// TODO this is hideous... fixme
 function getInjectableNames(statements = []) {
   return statements.map((statement) => {
     switch (statement.type) {
@@ -25,7 +26,13 @@ function getInjectableNames(statements = []) {
           return undefined;
         }
       case "ExportDefaultDeclaration":
-        return `${statement.declaration.arguments[0].value}${getInjectableTypeSuffix(statement.declaration)}`;
+        let callExpression;
+        if (statement.declaration.type === "MemberExpression") {
+          callExpression = statement.declaration.object;
+        } else {
+          callExpression = statement.declaration;
+        }
+        return `${callExpression.arguments[0].value}${getInjectableTypeSuffix(callExpression)}`;
       default:
         return undefined;
     }
@@ -43,6 +50,7 @@ function buildDependencyMap(directory) {
       }
 
       const moduleNames = getInjectableNames(potentialDependencies).filter((val) => val);
+
       if (moduleNames.length) {
         moduleNames.forEach((moduleName) => {
           acc[moduleName] = file;

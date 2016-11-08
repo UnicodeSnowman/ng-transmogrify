@@ -7,7 +7,7 @@ describe("htInputFormatArea", () => {
   beforeEach(() => {
     jasmine.addMatchers(formatters);
 
-    inject((htInputFormatArea, Lookup) => {
+    inject((htInputFormatArea, _Lookup_) => {
       formatter = htInputFormatArea;
       localizationContext = { area_unit_id: Lookup.AreaUnit.SM.id };
     });

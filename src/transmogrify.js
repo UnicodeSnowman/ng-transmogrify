@@ -52,8 +52,14 @@ function resolvePath(pathToDependency, currentFilePath) {
 
 function dedupeDependencies(identifiers, dependencyMap) {
   return flow(
-    filter(({ name }) => dependencyMap[name]),
-    map("name"),
+    map(({ name }) => {
+      if (name[0] === "_" && name[name.length - 1] === "_") {
+        return name.slice(1, name.length - 1);
+      } else {
+        return name;
+      }
+    }),
+    filter((name) => dependencyMap[name]),
     groupBy((key) => dependencyMap[key]),
     mapValuesWithKey((dependencyIdentifiers, importPath) => {
       if (dependencyIdentifiers.length > 1) {
@@ -112,6 +118,9 @@ function transformSpec({ ast, dependencyMap, filepath }) {
         // so to get us to the body of the surrounding block statement, we need:
         // path.parentPath.parentPath.parentPath.node.body
         injectParentBody = path.parentPath.parentPath.parentPath.node.body;
+        if (injectParentBody == null) {
+          console.log("FAIL", filepath);
+        }
         this.abort();
       } else {
         this.traverse(path);
@@ -121,12 +130,14 @@ function transformSpec({ ast, dependencyMap, filepath }) {
 
   const dependencies = dedupeDependencies(dependencyIdentifiers, dependencyMap);
 
-  const angularMockModule = callExpression(
-    identifier("angular.mock.module"),
-    Object.keys(dependencies).map((name) => identifier(`${name}Module`))
-  );
+  if (Object.keys(dependencies).length) {
+    const angularMockModule = callExpression(
+      identifier("angular.mock.module"),
+      Object.keys(dependencies).map((name) => identifier(`${name}Module`))
+    );
 
-  injectParentBody.unshift(expressionStatement(angularMockModule));
+    injectParentBody.unshift(expressionStatement(angularMockModule));
+  }
 
   forEachWithKey((pathToDependency, dependencyName) => {
     const resolvedPath = resolvePath(pathToDependency, filepath)

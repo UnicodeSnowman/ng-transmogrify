@@ -1,1 +1,3 @@
-/Users/christophercaplinger/workspace/ng-transmogrify/bin/transmogrify --dependencyDir /Users/christophercaplinger/workspace/hightower/frontend/javascripts/app --convertDir /Users/christophercaplinger/workspace/hightower/spec/javascripts/common/ht_input_formats
+/Users/christophercaplinger/workspace/ng-transmogrify/bin/transmogrify \
+--dependencyDir /Users/christophercaplinger/workspace/hightower/frontend/javascripts/app \
+--convertDir /Users/christophercaplinger/workspace/hightower/frontend/javascripts/app/common/models
