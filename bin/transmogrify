@@ -17,7 +17,8 @@ filesInDirectory(convertDir).forEach((filepath) => {
       $state: "~angular-ui-router",
       $stateParams: "~angular-ui-router",
       $translate: "~angular-translate",
-      $resource: "~angular-resource"
+      $resource: "~angular-resource",
+      $sanitize: "~angular-sanitize"
     })
   );
 

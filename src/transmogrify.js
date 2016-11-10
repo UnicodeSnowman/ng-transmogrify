@@ -1,6 +1,18 @@
 import recast from "recast";
 import path from "path";
-import { flow, filter, map, forEach, camelCase, invert, mapValues, groupBy } from "lodash/fp";
+import {
+  flatten,
+  flow,
+  filter,
+  map,
+  forEach,
+  camelCase,
+  reduce,
+  invert,
+  mapValues,
+  groupBy
+} from "lodash/fp";
+import readlineSync from "readline-sync";
 const mapValuesWithKey = mapValues.convert({ cap: false });
 const forEachWithKey = forEach.convert({ cap: false });
 
@@ -82,28 +94,53 @@ function dedupeDependencies(identifiers, dependencyMap) {
   )(identifiers);
 }
 
-function transformModule({ ast, bodyIndex, dependencyMap, filepath }) {
-  const { expression } = ast.program.body[bodyIndex];
+function transformModule({ ast, dependencyMap, filepath }) {
+  let angularModuleIndices = ast.program.body.reduce((acc, statement, index) => {
+    if (isAngularModule(statement && statement.expression)) {
+      return acc.concat(index);
+    }
+    return acc;
+  }, []);
+
+  if (!angularModuleIndices.length) {
+    console.log(`No angular modules found, unable to convert ${filepath}`);
+    return ast;
+  }
+
+  if (angularModuleIndices.length > 1) {
+    readlineSync.question(`Multiple Angular module declarations found in ${filepath} at indices: ${angularModuleIndices}, please be sure to manually intervene here...`)
+  }
 
   // de-dupe dependencies
-  const dependencies = dedupeDependencies(getInjectionIdentifiers(expression.arguments), dependencyMap)
+  const moduleDependencies = angularModuleIndices.map((index) => {
+    const { expression } = ast.program.body[index];
+    return {
+      index,
+      dependencies: dedupeDependencies(getInjectionIdentifiers(expression.arguments), dependencyMap)
+    }
+  });
+
+  // add dependencies to each module
+  forEach(({ index, dependencies }) => {
+    const { expression } = ast.program.body[index];
+    const dependencyIdentifiers = Object.keys(dependencies)
+      .map((name) => identifier(`${name}Module`));
+
+    expression.callee.object.arguments[0] = expression.arguments[0];
+    expression.callee.object.arguments.push(arrayExpression(dependencyIdentifiers));
+
+    ast.program.body[index] =
+      exportDefaultDeclaration(memberExpression(expression, identifier("name")));
+  })(moduleDependencies);
 
   // import dependencies
-  forEachWithKey((pathToDependency, dependencyName) => {
-    const resolvedPath = resolvePath(pathToDependency, filepath)
-    ast.program.body.unshift(buildES6Import(dependencyName, resolvedPath));
-    bodyIndex++;
-  })(dependencies);
-
-  // add dependencies to module
-  const dependencyIdentifiers = Object.keys(dependencies)
-    .map((name) => identifier(`${name}Module`));
-
-  expression.callee.object.arguments[0] = expression.arguments[0];
-  expression.callee.object.arguments.push(arrayExpression(dependencyIdentifiers));
-
-  ast.program.body[bodyIndex] =
-    exportDefaultDeclaration(memberExpression(expression, identifier("name")));
+  flow(
+    reduce((acc, { dependencies }) => Object.assign({}, acc, dependencies), {}),
+    forEachWithKey((pathToDependency, dependencyName) => {
+      const resolvedPath = resolvePath(pathToDependency, filepath)
+      ast.program.body.unshift(buildES6Import(dependencyName, resolvedPath));
+    })
+  )(moduleDependencies);
 
   return ast;
 }
@@ -156,33 +193,7 @@ function transformSpec({ ast, dependencyMap, filepath }) {
 }
 
 export default function(fileString, filepath, dependencyMap) {
-  let ast = recast.parse(fileString);
-
-  if (filepath.indexOf("_spec.js") >= 0) {
-    ast = transformSpec({
-      ast,
-      dependencyMap,
-      filepath
-    })
-  } else {
-    // TODO will take first index of an angular module found... likely need to handle
-    // case where we have multiple angular modules in the file
-    let angularModuleIndex = ast.program.body.findIndex((statement) => isAngularModule(statement.expression));
-
-    if (angularModuleIndex >= 0) {
-      ast = transformModule({
-        ast,
-        bodyIndex: angularModuleIndex,
-        dependencyMap,
-        filepath
-      });
-    } else {
-      console.log(`Unable to transform file: ${filepath}`)
-    }
-  }
-
-  return recast.prettyPrint(ast, {
-    tabWidth: 2,
-    reuseWhitespace: true
-  }).code.trim();
+  const ast = recast.parse(fileString);
+  const transform = filepath.indexOf("_spec.js") >= 0 ? transformSpec : transformModule;
+  return recast.prettyPrint(transform({ ast, dependencyMap, filepath }), { tabWidth: 2 }).code.trim();
 }
