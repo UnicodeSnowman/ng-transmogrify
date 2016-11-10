@@ -1,5 +1,4 @@
 import recast from "recast";
-import { isAngularModule } from "./utils";
 import path from "path";
 import { flow, filter, map, forEach, camelCase, invert, mapValues, groupBy } from "lodash/fp";
 const mapValuesWithKey = mapValues.convert({ cap: false });
@@ -16,6 +15,16 @@ const {
   identifier,
   arrayExpression
 } = recast.types.builders;
+
+export function isAngularModule(expression) {
+  const callee =
+    expression &&
+    expression.callee &&
+    expression.callee &&
+    expression.callee.object &&
+    expression.callee.object.callee;
+  return !!(callee && callee.object.name === "angular" && callee.property.name === "module");
+}
 
 function getInjectionIdentifiers(args = []) {
   return args[args.length - 1].params
@@ -72,7 +81,6 @@ function dedupeDependencies(identifiers, dependencyMap) {
     invert
   )(identifiers);
 }
-
 
 function transformModule({ ast, bodyIndex, dependencyMap, filepath }) {
   const { expression } = ast.program.body[bodyIndex];

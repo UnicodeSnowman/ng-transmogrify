@@ -1,55 +1,33 @@
 import recast from "recast";
 import path from "path";
 import fs from "fs";
-import { filesInDirectory, isAngularModule } from "./utils";
+import { filesInDirectory } from "./utils";
 
-function isPotentialDependency(obj) {
-  return ["ExpressionStatement", "ExportDefaultDeclaration"].includes(obj.type);
-}
-
-function getInjectableTypeSuffix(node) {
-  if (node.callee.property.name === "filter") {
-    return "Filter"
-  } else {
-    return "";
-  }
-}
-
-// TODO this is hideous... fixme
-function getInjectableNames(statements = []) {
-  return statements.map((statement) => {
-    switch (statement.type) {
-      case "ExpressionStatement":
-        if (isAngularModule(statement.expression)) {
-          return `${statement.expression.arguments[0].value}${getInjectableTypeSuffix(statement.expression)}`;
-        } else {
-          return undefined;
+function getInjectableNames(ast) {
+  const angularModules = [];
+  recast.visit(ast, {
+    visitCallExpression: function(path) {
+      const { object, property } = path.node.callee;
+      if (property && ["controller", "factory", "directive", "service", "filter"].includes(property.name)) {
+        const memberExpression = object.callee;
+        if (memberExpression && memberExpression.object.name === "angular" && memberExpression.property.name === "module") {
+          const dependencyName = path.node.arguments[0].value
+          const suffix = property.name === "filter" ? "Filter" : "";
+          angularModules.push(`${dependencyName}${suffix}`);
         }
-      case "ExportDefaultDeclaration":
-        let callExpression;
-        if (statement.declaration.type === "MemberExpression") {
-          callExpression = statement.declaration.object;
-        } else {
-          callExpression = statement.declaration;
-        }
-        return `${callExpression.arguments[0].value}${getInjectableTypeSuffix(callExpression)}`;
-      default:
-        return undefined;
+      }
+      this.traverse(path);
     }
   });
+
+  return angularModules;
 }
 
 function buildDependencyMap(directory) {
   const result = filesInDirectory(directory).reduce((acc, file) => {
     try {
       const ast = recast.parse(fs.readFileSync(file));
-      const potentialDependencies = ast.program.body.filter(isPotentialDependency);
-
-      if (!potentialDependencies.length) {
-        return acc;
-      }
-
-      const moduleNames = getInjectableNames(potentialDependencies).filter((val) => val);
+      const moduleNames = getInjectableNames(ast);
 
       if (moduleNames.length) {
         moduleNames.forEach((moduleName) => {
